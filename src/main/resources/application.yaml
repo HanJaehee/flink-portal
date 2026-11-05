@@ -1,0 +1,17 @@
+spring:
+  application:
+    name: flink-portal
+  threads:
+    virtual:
+      enabled: true
+  main:
+    banner-mode: "off"
+server:
+  address: ${PORTAL_BIND_ADDRESS:127.0.0.1}
+  port: ${PORT:8080}
+  shutdown: graceful
+portal:
+  namespaces: ${PORTAL_NAMESPACES:default}
+  kube-context: ${PORTAL_KUBE_CONTEXT:}
+  transport: ${PORTAL_TRANSPORT:auto}
+  refresh-ms: ${PORTAL_REFRESH_MS:5000}

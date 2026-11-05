@@ -1,0 +1,20 @@
+Portal is deployed in {{ .Release.Namespace }} and discovers:
+{{ join ", " .Values.portal.namespaces }}
+
+{{ if .Values.ingress.enabled }}
+Portal Ingress hosts:
+{{ range .Values.ingress.hosts }}
+  {{ . }}
+{{ end }}
+Use HTTPS for hosts configured in ingress.tls; otherwise use HTTP unless your
+controller terminates TLS separately. DNS must resolve to your Ingress controller.
+{{ end }}
+Open a local connection to Portal (also available when Ingress is enabled):
+  kubectl -n {{ .Release.Namespace }} port-forward service/{{ include "flink-portal.fullname" . }} 18090:{{ .Values.service.port }}
+  http://127.0.0.1:18090/
+
+Browsers communicate only with Portal. Portal proxies Flink UIs internally using
+Service DNS. The ServiceAccount reads Kubernetes resources; services/proxy is
+not granted. Target namespaces must already exist and be reachable from Portal.
+Portal has no login. Configure authentication at your Ingress before exposing it
+outside a trusted test network.

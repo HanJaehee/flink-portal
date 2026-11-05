@@ -1,0 +1,42 @@
+{{- if .Values.rbac.create }}
+{{- $root := . }}
+{{- range .Values.portal.namespaces }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "flink-portal.readerName" $root }}
+  namespace: {{ . | quote }}
+  labels:
+    {{- include "flink-portal.labels" $root | nindent 4 }}
+rules:
+  - apiGroups: [flink.apache.org]
+    resources: [flinkdeployments]
+    verbs: [get, list, watch]
+  - apiGroups: [""]
+    resources: [services, pods]
+    verbs: [get, list, watch]
+  - apiGroups: [apps]
+    resources: [deployments]
+    verbs: [get, list, watch]
+  - apiGroups: [discovery.k8s.io]
+    resources: [endpointslices]
+    verbs: [get, list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "flink-portal.readerName" $root }}
+  namespace: {{ . | quote }}
+  labels:
+    {{- include "flink-portal.labels" $root | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "flink-portal.readerName" $root }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "flink-portal.serviceAccountName" $root }}
+    namespace: {{ $root.Release.Namespace }}
+{{- end }}
+{{- end }}

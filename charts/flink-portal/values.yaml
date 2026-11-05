@@ -1,0 +1,46 @@
+replicaCount: 1
+nameOverride: ""
+fullnameOverride: ""
+image:
+  repository: ghcr.io/hanjaehee/flink-portal
+  tag: "" # Defaults to Chart.appVersion. Build and push this image before installing.
+  pullPolicy: IfNotPresent
+imagePullSecrets: []
+serviceAccount:
+  create: true
+  name: ""
+rbac:
+  create: true
+portal:
+  namespaces: [default] # Existing namespaces to discover; explicit names only.
+  refreshMs: 5000
+service:
+  port: 8080
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts: [] # Required when enabled; Portal is served at / on each host.
+  tls: [] # Existing TLS Secrets in the release namespace.
+resources:
+  requests:
+    cpu: 100m
+    memory: 384Mi
+  limits:
+    cpu: "1"
+    memory: 768Mi
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  seccompProfile:
+    type: RuntimeDefault
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: [ALL]
+nodeSelector: {}
+tolerations: []
+affinity: {}
+podAnnotations: {}

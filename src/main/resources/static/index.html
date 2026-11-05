@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Flink Portal</title>
+  <link rel="stylesheet" href="/portal.css">
+  <script src="/portal.js" defer></script>
+</head>
+<body>
+  <header class="topbar"><a class="brand" href="/" aria-label="Flink Portal home"><span class="mark" aria-hidden="true">↗</span> Flink<span class="brand-light">Portal</span></a><span class="top-note">One place. Every cluster.</span><span class="connection" id="connection"><i></i> Connecting</span></header>
+  <main>
+    <section class="intro"><div><p class="eyebrow">YOUR FLINK WORKSPACE</p><h1>All your clusters.<br><span>One way in.</span></h1><p class="subtitle">Find your cluster and step into its Flink dashboard.</p></div><div class="intro-label"><span class="orbit" aria-hidden="true">↗</span><span>Less searching.<br>More streaming.</span></div></section>
+    <section class="stats" aria-label="Cluster overview"><div><span class="stat-label">Discovered clusters</span><strong id="total">—</strong></div><div><span class="stat-label"><i class="dot green"></i> UI available</span><strong id="available">—</strong></div><div><span class="stat-label"><i class="dot amber"></i> UI unavailable</span><strong id="unavailable">—</strong></div></section>
+    <section class="workspace" aria-label="Clusters">
+      <div class="section-heading"><h2>Clusters <span id="count" class="count">0</span></h2><div class="refresh"><span id="updated" aria-live="polite">Discovering clusters…</span><button type="button" id="refresh" aria-label="Refresh clusters">↻ <span>Refresh</span></button></div></div>
+      <div id="error" class="error" role="alert" hidden></div>
+      <div class="toolbar"><div class="search"><span aria-hidden="true">⌕</span><label class="sr-only" for="search">Search clusters</label><input id="search" type="search" placeholder="Search clusters, namespaces or jobs…" autocomplete="off"></div><label class="namespace-label" for="namespace">Namespace <select id="namespace"><option value="">All namespaces</option></select></label></div>
+      <div class="table-wrap"><table><thead><tr><th scope="col">CLUSTER</th><th scope="col">JOBS</th><th scope="col">RESOURCES</th><th scope="col">ACCESS</th></tr></thead><tbody id="clusters"></tbody></table><div id="empty" class="empty" hidden><span aria-hidden="true">◇</span><h3>No clusters here yet</h3><p id="empty-description">Clusters will appear as they are discovered.</p></div></div>
+      <div class="table-footer"><span id="showing">Waiting for discovery</span><span><i class="dot green"></i> Auto-refresh every 5 seconds</span></div>
+    </section>
+    <footer><span>FLINK PORTAL</span><span>A direct route to your existing Flink Web UIs.</span></footer>
+  </main>
+</body>
+</html>
