@@ -9,20 +9,17 @@ Portal uses its mounted SA token to list Kubernetes resources. Flink REST and UI
 traffic goes from Portal to the discovered internal Service DNS; the browser only
 connects to Portal. Flink Operator CRDs and native Flink deployments must exist.
 
-## Build and install
+## Install
 
-The image name below is a destination you own, not a published image. Build and
-push the matching application image before installing. Choose platforms to match
-your cluster, then provide imagePullSecrets for a private registry.
+The default public image is [`hindsighta/flink-portal:0.1.0`](https://hub.docker.com/r/hindsighta/flink-portal),
+available for linux/amd64 and linux/arm64. No image pull Secret is required for it.
+Override `image.repository` and `image.tag` to use your own build, and provide
+`imagePullSecrets` if that image is private.
 
 ```sh
-docker buildx build --platform linux/amd64 \
-  -t YOUR_REGISTRY/flink-portal:YOUR_TAG --push .
 helm lint charts/flink-portal --strict
 helm upgrade --install flink-portal charts/flink-portal \
   --namespace flink-portal --create-namespace \
-  --set image.repository=YOUR_REGISTRY/flink-portal \
-  --set image.tag=YOUR_TAG \
   --set 'portal.namespaces={flink-demo-a,flink-demo-b}' \
   --wait --timeout 5m
 kubectl -n flink-portal port-forward service/flink-portal 18090:8080

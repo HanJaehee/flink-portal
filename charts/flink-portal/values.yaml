@@ -2,8 +2,8 @@ replicaCount: 1
 nameOverride: ""
 fullnameOverride: ""
 image:
-  repository: ghcr.io/hanjaehee/flink-portal
-  tag: "" # Defaults to Chart.appVersion. Build and push this image before installing.
+  repository: hindsighta/flink-portal
+  tag: "" # Defaults to Chart.appVersion.
   pullPolicy: IfNotPresent
 imagePullSecrets: []
 serviceAccount:

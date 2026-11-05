@@ -72,16 +72,14 @@ The browser refreshes the list every five seconds independently of the backend i
 ## Deploy in Kubernetes with Helm
 
 The reusable chart is in [`charts/flink-portal`](charts/flink-portal/README.md).
-Build and publish your own image, then install in a dedicated namespace. Match
-`--platform` to your cluster nodes; the example below targets amd64.
+The public image is [`hindsighta/flink-portal:0.1.0`](https://hub.docker.com/r/hindsighta/flink-portal)
+(full reference: `docker.io/hindsighta/flink-portal:0.1.0`). It supports linux/amd64
+and linux/arm64 and does not require registry credentials.
 
 ```sh
-docker buildx build --platform linux/amd64 \
-  -t YOUR_REGISTRY/flink-portal:YOUR_TAG --push .
+docker pull hindsighta/flink-portal:0.1.0
 helm upgrade --install flink-portal charts/flink-portal \
   --namespace flink-portal --create-namespace \
-  --set image.repository=YOUR_REGISTRY/flink-portal \
-  --set image.tag=YOUR_TAG \
   --set 'portal.namespaces={team-a,team-b}' \
   --wait --timeout 5m
 kubectl -n flink-portal port-forward service/flink-portal 18090:8080
@@ -90,11 +88,11 @@ kubectl -n flink-portal port-forward service/flink-portal 18090:8080
 Open <http://127.0.0.1:18090/>. Target namespaces must already exist. Helm creates
 read-only Roles/RoleBindings in each configured namespace for the Portal
 ServiceAccount and explicitly selects direct internal Flink Service access.
-Provide `imagePullSecrets` for a private image. Registry credentials remain in
-separately provisioned Kubernetes Secrets.
+If you override the image with a private image, provide `imagePullSecrets`.
+Registry credentials remain in separately provisioned Kubernetes Secrets.
 
-The chart's default image path is a placeholder destination, not a published
-image. The ClusterIP Service is the single entry point. Enable the optional
+The chart defaults to the public release image above. The ClusterIP Service is
+the single entry point. Enable the optional
 root-path Ingress for access through your controller; see the chart README for
 values, TLS and cleanup. No per-Flink Ingress or ExternalName Service is needed.
 
