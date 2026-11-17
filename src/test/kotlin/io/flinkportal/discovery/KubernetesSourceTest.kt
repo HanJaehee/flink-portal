@@ -17,7 +17,7 @@ class KubernetesSourceTest {
             200 to
                 when {
                     path.contains("flinkdeployments") && !path.contains("continue=") ->
-                        """{"apiVersion":"flink.apache.org/v1beta1","kind":"FlinkDeploymentList","metadata":{"continue":"next-page"},"items":[{"apiVersion":"flink.apache.org/v1beta1","kind":"FlinkDeployment","metadata":{"name":"demo","namespace":"a","uid":"cr-a"},"spec":{"flinkVersion":"v2_3","job":{"state":"suspended"}},"status":{"jobStatus":{"state":"FINISHED"}}}]}"""
+                        """{"apiVersion":"flink.apache.org/v1beta1","kind":"FlinkDeploymentList","metadata":{"continue":"next-page"},"items":[{"apiVersion":"flink.apache.org/v1beta1","kind":"FlinkDeployment","metadata":{"name":"demo","namespace":"a","uid":"cr-a"},"spec":{"flinkVersion":"v2_3","job":{"state":"suspended"}},"status":{"jobStatus":{"state":"FINISHED","jobId":"0123456789abcdef0123456789abcdef"}}}]}"""
                     else -> """{"apiVersion":"v1","kind":"List","metadata":{},"items":[]}"""
                 }
         }
@@ -27,6 +27,11 @@ class KubernetesSourceTest {
                     .build()
                     .use { client ->
                         val result = KubernetesSource(client).read(setOf("a"))
+                        assertEquals("APPLICATION", result.flinks.single().mode)
+                        assertEquals(
+                            "0123456789abcdef0123456789abcdef",
+                            result.flinks.single().applicationJobId,
+                        )
                         assertEquals("FINISHED", result.flinks.single().jobState)
                         assertTrue(result.flinks.single().suspended)
                         assertEquals("cr-a", result.flinks.single().uid)

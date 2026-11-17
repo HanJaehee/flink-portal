@@ -86,3 +86,13 @@ helm uninstall flink-portal --namespace flink-portal
 
 Uninstall removes the release's cross-namespace Roles/RoleBindings too. It does
 not delete target namespaces, Flink CRDs or jobs. The chart has no dependencies.
+
+## OCI distribution
+
+After a release is published by GitHub Actions and the GHCR package is public,
+install the packaged chart using
+`oci://ghcr.io/hanjaehee/charts/flink-portal` with `--version <chart-version>`.
+The chart version is independent of its `appVersion` and the Docker image tag.
+See the repository's [CI and publishing instructions](../../README.md#ci-and-publishing)
+for token setup, release tagging, and initial package visibility. Source installs
+above remain available before the first OCI publication.

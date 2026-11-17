@@ -1,0 +1,126 @@
+name: Publish image and Helm chart
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  metadata:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      chart_version: ${{ steps.version.outputs.chart_version }}
+      chart_registry: ${{ steps.version.outputs.chart_registry }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: azure/setup-helm@2f5e7bc67f1f9972ab16657bb795f36d8f04de0e # v5.1.0
+        with:
+          version: v4.3.1
+      - name: Validate release version and branch
+        id: version
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+          REPOSITORY_OWNER: ${{ github.repository_owner }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "$RELEASE_TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo 'Release tags must use vMAJOR.MINOR.PATCH.' >&2
+            exit 1
+          fi
+          if ! git merge-base --is-ancestor HEAD origin/main; then
+            echo 'Release tags must point to a commit already merged into main.' >&2
+            exit 1
+          fi
+          version="${RELEASE_TAG#v}"
+          chart_version=$(helm show chart charts/flink-portal | awk '$1 == "version:" {gsub(/"/, "", $2); print $2}')
+          app_version=$(helm show chart charts/flink-portal | awk '$1 == "appVersion:" {gsub(/"/, "", $2); print $2}')
+          if [[ "$app_version" != "$version" ]]; then
+            echo "Chart appVersion ($app_version) must match release version ($version)." >&2
+            exit 1
+          fi
+          image=$(helm template flink-portal charts/flink-portal | awk '$1 == "image:" {gsub(/"/, "", $2); print $2}')
+          if [[ "$image" != "hindsighta/flink-portal:$version" ]]; then
+            echo "Chart default image ($image) must reference the image being published." >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "chart_version=$chart_version" >> "$GITHUB_OUTPUT"
+          owner=$(printf '%s' "$REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')
+          echo "chart_registry=ghcr.io/$owner/charts" >> "$GITHUB_OUTPUT"
+
+  verify:
+    uses: ./.github/workflows/ci.yml
+
+  image:
+    needs: [metadata, verify]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Require Docker Hub publishing token
+        env:
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          if [ -z "$DOCKERHUB_TOKEN" ]; then
+            echo 'Configure the DOCKERHUB_TOKEN repository secret for hindsighta.' >&2
+            exit 1
+          fi
+      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          username: hindsighta
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: hindsighta/flink-portal:${{ needs.metadata.outputs.version }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ needs.metadata.outputs.version }}
+          cache-from: type=gha,scope=flink-portal
+          cache-to: type=gha,mode=max,scope=flink-portal
+
+  chart:
+    needs: [metadata, image]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: azure/setup-helm@2f5e7bc67f1f9972ab16657bb795f36d8f04de0e # v5.1.0
+        with:
+          version: v4.3.1
+      - name: Publish OCI chart after the image is available
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_USERNAME: ${{ github.actor }}
+          CHART_REGISTRY: ${{ needs.metadata.outputs.chart_registry }}
+          CHART_VERSION: ${{ needs.metadata.outputs.chart_version }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$GHCR_TOKEN" | helm registry login ghcr.io --username "$GHCR_USERNAME" --password-stdin
+          helm package charts/flink-portal --destination dist
+          helm push "dist/flink-portal-$CHART_VERSION.tgz" "oci://$CHART_REGISTRY"
+          helm show chart "oci://$CHART_REGISTRY/flink-portal" --version "$CHART_VERSION"

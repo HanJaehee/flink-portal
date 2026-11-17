@@ -49,6 +49,10 @@ class MetadataTest {
                                     .expectStatus()
                                     .isOk
                                     .expectBody()
+                                    .jsonPath("$.clusters[0].mode")
+                                    .isEqualTo("SESSION")
+                                    .jsonPath("$.clusters[0].applicationJobId")
+                                    .isEmpty
                                     .jsonPath("$.clusters[0].image")
                                     .isEqualTo("registry/flink:tag")
                                     .jsonPath("$.clusters[0].jobManager.readyCount")

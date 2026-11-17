@@ -14,6 +14,8 @@ data class FlinkRecord(
     val image: String? = null,
     val jobManager: ManagerResources = ManagerResources(),
     val taskManager: ManagerResources = ManagerResources(),
+    val mode: String = "UNKNOWN",
+    val applicationJobId: String? = null,
 )
 
 data class ResourceAllocation(val cpu: String? = null, val memory: String? = null)

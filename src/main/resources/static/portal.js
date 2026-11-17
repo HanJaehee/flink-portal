@@ -1,7 +1,13 @@
 /* Resource names and status messages are always rendered as text, never markup. */
+import { clusterStates, matchesCluster, clusterLinks } from './portal-model.js';
 const byId = (id) => document.getElementById(id);
 let clusters = [];
 let loading = false;
+let selectedState = '';
+const stateLabel = state => ({ NO_JOBS: 'No jobs', UNKNOWN: 'Unknown' }[state] || state);
+const stateTone = state => ['FAILED', 'FAILING'].includes(state) ? 'failed' :
+  ['RUNNING', 'FINISHED'].includes(state) ? 'healthy' :
+  ['CREATED', 'INITIALIZING', 'RESTARTING', 'RECONCILING', 'CANCELLING', 'SUSPENDED'].includes(state) ? 'pending' : 'neutral';
 const reasonText = {
   suspended: 'Suspended', 'missing-service': 'Starting', 'no-ready-endpoints': 'Waiting for endpoints',
   'rest-unreachable': 'Temporarily unavailable', 'ambiguous-service': 'Service conflict',
@@ -32,59 +38,87 @@ function managerRow(label, manager, fresh) {
 function render() {
   const search = byId('search').value.toLowerCase().trim();
   const namespace = byId('namespace').value;
-  const visible = clusters.filter(c => (!namespace || c.namespace === namespace) && `${c.name} ${c.namespace} ${(c.jobs || []).map(j => `${j.name} ${j.id} ${j.state}`).join(" ")}`.toLowerCase().includes(search));
-  const rows = visible.map(c => {
-    const row = element('tr');
-    const nameCell = element('td');
-    nameCell.append(element('span', 'cluster-name', c.name), element('span', 'version', `Apache Flink ${c.version}`));
-    const ns = element('div', 'cluster-namespace'); ns.append(element('span', 'namespace', c.namespace));
-    nameCell.append(ns, element('span', 'cluster-image', `Image: ${c.image || '—'}`));
-    const stateCell = element('td', 'jobs-cell');
+  const visible = clusters.filter(c => matchesCluster(c, search, namespace, selectedState));
+  const states = [...new Set(clusters.flatMap(clusterStates))].sort();
+  if (selectedState && !states.includes(selectedState)) states.push(selectedState);
+  const filters = ['', ...states].map(state => {
+    const count = clusters.filter(c => matchesCluster(c, search, namespace, state)).length;
+    const button = element('button', `status-filter ${state === selectedState ? 'selected' : ''}`);
+    button.type = 'button';
+    button.setAttribute('aria-pressed', String(state === selectedState));
+    button.append(element('span', '', state ? stateLabel(state) : 'All statuses'), element('span', 'filter-count', count));
+    button.addEventListener('click', () => { selectedState = state; render(); });
+    return button;
+  });
+  // Preserve focus while the background refresh replaces filter counts.
+  const focusedState = document.activeElement?.closest('#status-filters button')?.dataset.state;
+  filters.forEach((button, index) => { button.dataset.state = ['', ...states][index]; });
+  byId('status-filters').replaceChildren(...filters);
+  if (focusedState !== undefined) filters.find(button => button.dataset.state === focusedState)?.focus();
+  const cards = visible.map(c => {
+    const card = element('article', 'cluster-card');
+    const header = element('div', 'card-heading');
+    const identity = element('div', 'cluster-identity');
+    identity.append(element('span', 'namespace', c.namespace), element('h3', 'cluster-name', c.name));
+    const mode = element('span', 'mode', c.mode === 'APPLICATION' ? 'Application' : c.mode === 'SESSION' ? 'Session' : 'Unknown mode');
+    header.append(identity, mode);
+    const availability = element('span', `availability ${c.uiAvailable ? '' : 'offline'}`);
+    availability.append(element('i', `dot ${c.uiAvailable ? 'green' : 'amber'}`), document.createTextNode(c.uiAvailable ? 'UI available' : (reasonText[c.reason] || 'UI unavailable')));
+    const metadata = element('div', 'cluster-meta');
+    metadata.append(element('span', 'version', `Apache Flink ${c.version}`), availability);
+    const image = element('div', 'cluster-image', c.image || 'Image unavailable');
+    image.title = c.image || '';
+    const jobs = element('section', 'card-jobs');
+    const jobHeading = element('div', 'card-label', `JOBS${Array.isArray(c.jobs) ? ` · ${c.jobs.length}` : ''}`);
+    jobs.append(jobHeading);
     if (Array.isArray(c.jobs) && c.jobs.length) {
       const list = element('ul', 'job-list');
       for (const job of c.jobs) {
-        const item = element('li', 'job-item');
-        const info = element('div', 'job-info');
-        info.append(element('span', 'job-name', job.name || '(Unnamed job)'), element('span', 'job-id', job.id));
+        const item = element('li', `job-item ${selectedState && job.state === selectedState ? 'matched' : ''}`);
+        const line = element('div', 'job-heading');
+        line.append(element('span', 'job-name', job.name || '(Unnamed job)'), element('span', `state ${stateTone(job.state)}`, job.state));
         const values = Array.isArray(job.parallelism) ? job.parallelism : [];
         const parallelism = values.length ? (values.length === 1 ? values[0] : `${values[0]}–${values[values.length - 1]}`) : '—';
-        const parallelismNode = element('span', 'job-detail', `Parallelism: ${parallelism}`);
+        const detail = element('div', 'job-detail');
+        const parallelismNode = element('span', '', `Parallelism ${parallelism}`);
         parallelismNode.title = 'Parallelism across job vertices; a range means different vertices use different values.';
-        info.append(parallelismNode, element('span', 'job-detail', `Started at: ${startedAt(job.startedAt)}`));
-        const tone = ['FAILED', 'FAILING'].includes(job.state) ? 'failed' :
-          ['RUNNING', 'FINISHED'].includes(job.state) ? 'healthy' :
-          ['CREATED', 'INITIALIZING', 'RESTARTING', 'RECONCILING', 'CANCELLING'].includes(job.state) ? 'pending' : 'neutral';
-        item.append(info, element('span', `state ${tone}`, job.state));
+        detail.append(parallelismNode, element('span', '', `Started ${startedAt(job.startedAt)}`));
+        item.append(line, element('span', 'job-id', job.id), detail);
         list.append(item);
       }
-      stateCell.append(list);
+      jobs.append(list);
     } else {
-      stateCell.append(element('span', 'job-placeholder', Array.isArray(c.jobs) ? 'No jobs' : 'Status unavailable'));
+      jobs.append(element('span', `state ${stateTone(clusterStates(c)[0])}`, stateLabel(clusterStates(c)[0])));
       if (!Array.isArray(c.jobs) && c.jobState && c.jobState !== 'UNKNOWN') {
-        stateCell.append(element('span', 'version', `Operator: ${c.jobState}`));
+        jobs.append(element('span', 'operator-state', `Last operator state: ${c.jobState}`));
       }
     }
-    const resourceCell = element('td', 'resources-cell');
-    resourceCell.append(managerRow('JM', c.jobManager, c.reason !== 'discovery-unavailable'), managerRow('TM', c.taskManager, c.reason !== 'discovery-unavailable'), element('span', 'resource-note', 'Per instance · configured requests / limits'));
-    const uiCell = element('td', 'access-cell');
-    const state = element('span', `availability ${c.uiAvailable ? '' : 'offline'}`);
-    state.append(element('i', `dot ${c.uiAvailable ? 'green' : 'amber'}`), document.createTextNode(c.uiAvailable ? 'Available' : (reasonText[c.reason] || 'Unavailable')));
-    uiCell.append(state);
-    const actionCell = element('td');
-    const link = element('a', `open ${c.uiAvailable ? '' : 'offline'}`, c.uiAvailable ? 'Open UI  ↗' : 'View status  ↗');
-    // Paths come from the portal, but constrain them to this origin and cluster prefix.
-    if (typeof c.uiPath === 'string' && c.uiPath.startsWith('/clusters/') && !c.uiPath.startsWith('//')) link.href = c.uiPath;
-    link.target = '_blank'; link.rel = 'noopener noreferrer';
-    link.setAttribute('aria-label', `${c.uiAvailable ? 'Open Flink UI' : 'View status'} for ${c.namespace}/${c.name}`);
-    uiCell.append(link); row.append(nameCell, stateCell, resourceCell, uiCell); return row;
+    const resources = element('section', 'card-resources');
+    const resourceHeading = element('div', 'card-label', 'RESOURCES');
+    resourceHeading.title = 'Configured CPU and memory per instance; counts show ready instances.';
+    resources.append(resourceHeading, managerRow('JobManager', c.jobManager, c.reason !== 'discovery-unavailable'), managerRow('TaskManager', c.taskManager, c.reason !== 'discovery-unavailable'));
+    const actions = element('div', 'card-actions');
+    const links = clusterLinks(c);
+    const action = (label, href, primary, title) => {
+      const link = element(href ? 'a' : 'button', `open ${primary ? 'primary' : ''}`, label);
+      if (href) { link.href = href; link.target = '_blank'; link.rel = 'noopener noreferrer'; }
+      else { link.type = 'button'; link.disabled = true; }
+      link.title = title;
+      link.setAttribute('aria-label', `${title} for ${c.namespace}/${c.name}`);
+      return link;
+    };
+    actions.append(action('Open UI ↗', links.ui, true, 'Open Flink UI'), action('Metrics ↗', links.metrics, false, 'JobManager metrics'), action('Logs ↗', links.logs, false, 'JobManager log files'));
+    if (c.mode === 'APPLICATION') actions.append(action('Job details ↗', links.job, false, links.job ? 'Open current application job' : 'Current application job is not available'));
+    card.append(header, metadata, image, jobs, resources, actions);
+    return card;
   });
-  byId('clusters').replaceChildren(...rows);
+  byId('clusters').replaceChildren(...cards);
   byId('total').textContent = clusters.length;
   byId('available').textContent = clusters.filter(c => c.uiAvailable).length;
   byId('unavailable').textContent = clusters.filter(c => !c.uiAvailable).length;
   byId('count').textContent = visible.length;
   byId('empty').hidden = visible.length !== 0;
-  byId('empty-description').textContent = clusters.length ? 'Try another search or namespace.' : 'Clusters will appear as they are discovered.';
+  byId('empty-description').textContent = clusters.length ? 'Try another search, namespace or status filter.' : 'Clusters will appear as they are discovered.';
   byId('showing').textContent = `Showing ${visible.length} of ${clusters.length} clusters`;
 }
 async function refresh() {
@@ -108,9 +142,9 @@ async function refresh() {
     clusters = clusters.map(c => ({ ...c, jobs: null, uiAvailable: false, reason: 'discovery-unavailable' }));
     render();
     byId('error').hidden = false;
-    byId('error').textContent = 'The portal could not refresh the cluster list. Showing the last received data; retrying shortly.';
     byId('connection').className = 'connection offline';
     byId('connection').replaceChildren(element('i'), document.createTextNode('Connection lost'));
+    byId('error').textContent = 'The portal could not refresh the cluster list. Showing the last received data; retrying shortly.';
   } finally { loading = false; byId('refresh').disabled = false; }
 }
 byId('search').addEventListener('input', render);
