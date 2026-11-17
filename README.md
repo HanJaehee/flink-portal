@@ -73,12 +73,13 @@ The browser refreshes the list every five seconds independently of the backend i
 ## Deploy in Kubernetes with Helm
 
 The reusable chart is in [`charts/flink-portal`](charts/flink-portal/README.md).
-The public image is [`hindsighta/flink-portal:0.1.0`](https://hub.docker.com/r/hindsighta/flink-portal)
-(full reference: `docker.io/hindsighta/flink-portal:0.1.0`). It supports linux/amd64
-and linux/arm64 and does not require registry credentials.
+The chart defaults to [`hindsighta/flink-portal:0.2.0`](https://hub.docker.com/r/hindsighta/flink-portal)
+(full reference: `docker.io/hindsighta/flink-portal:0.2.0`). Release images support
+linux/amd64 and linux/arm64 and are published publicly by the release workflow.
+Wait for successful publication before installing a new release version.
 
 ```sh
-docker pull hindsighta/flink-portal:0.1.0
+docker pull hindsighta/flink-portal:0.2.0
 helm upgrade --install flink-portal charts/flink-portal \
   --namespace flink-portal --create-namespace \
   --set 'portal.namespaces={team-a,team-b}' \
@@ -225,7 +226,7 @@ For each release, update `charts/flink-portal/Chart.yaml` with a new, unused cha
 `version` and set `appVersion` to the application release version. Keep the default
 image repository as `hindsighta/flink-portal` and `image.tag` empty (or set to that
 same application version). For example, an app release `0.2.0` can use chart
-`0.3.0` and `appVersion: "0.2.0"`. Commit and merge these changes before tagging:
+`0.2.2` and `appVersion: "0.2.0"`. Commit and merge these changes before tagging:
 
 ```sh
 git switch main
@@ -245,7 +246,7 @@ After successful publication and the package visibility change:
 
 ```sh
 helm upgrade --install flink-portal oci://ghcr.io/hanjaehee/charts/flink-portal \
-  --version 0.3.0 --namespace flink-portal --create-namespace \
+  --version 0.2.2 --namespace flink-portal --create-namespace \
   --set 'portal.namespaces={team-a,team-b}'
 ```
 

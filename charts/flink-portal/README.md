@@ -11,8 +11,10 @@ connects to Portal. Flink Operator CRDs and native Flink deployments must exist.
 
 ## Install
 
-The default public image is [`hindsighta/flink-portal:0.1.0`](https://hub.docker.com/r/hindsighta/flink-portal),
-available for linux/amd64 and linux/arm64. No image pull Secret is required for it.
+The default image reference is [`hindsighta/flink-portal:0.2.0`](https://hub.docker.com/r/hindsighta/flink-portal).
+The release workflow publishes linux/amd64 and linux/arm64 images publicly.
+Wait for publication to finish before installing a new release; no image pull
+Secret is required for a published public image.
 Override `image.repository` and `image.tag` to use your own build, and provide
 `imagePullSecrets` if that image is private.
 
