@@ -26,6 +26,7 @@ Your kubeconfig context must have the discovery permissions described below and
 
 ```sh
 ./gradlew check bootJar
+node --test src/test/portal-model.test.mjs # Node.js 22+
 export KUBECONFIG="$HOME/.kube/config"
 export PORTAL_KUBE_CONTEXT=my-context
 export PORTAL_NAMESPACES=team-a,team-b
@@ -160,6 +161,7 @@ do not generate per-request warning logs.
 ./gradlew test
 ./gradlew formatKotlin
 ./gradlew check bootJar
+node --test src/test/portal-model.test.mjs # Node.js 22+
 ```
 
 Tests cover namespace isolation, ownership and UID replacement, EndpointSlice
@@ -190,3 +192,13 @@ min–max range when vertices differ. At most four detail requests run concurren
 within the existing 2.5-second status budget, with 4 MiB per response. Failure or
 timeout of optional details leaves summary status available and parallelism
 unknown. No previous details are reused as current information.
+
+Clusters are displayed as responsive cards with namespace, application/session mode,
+all retained jobs and manager resources. Job-status filter buttons combine with
+search and namespace selection; a session cluster can match multiple statuses.
+Unknown status does not reuse the last Operator state as a live job state.
+
+Metrics and Logs open the JobManager metrics and log-file screens in the proxied
+Flink UI. Application cards also offer Job details when the Operator's current
+job ID matches a retained REST job. Completed jobs open the completed-job view.
+Shortcuts are disabled while the UI or current application job is unavailable.

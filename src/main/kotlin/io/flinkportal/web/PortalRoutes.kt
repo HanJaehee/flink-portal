@@ -43,6 +43,8 @@ class PortalRoutes(private val registry: ClusterRegistry) {
                                     cluster.flink.version.removePrefix("v").replace('_', '.'),
                                 "jobState" to cluster.flink.jobState,
                                 "image" to cluster.flink.image,
+                                "mode" to cluster.flink.mode,
+                                "applicationJobId" to cluster.flink.applicationJobId,
                                 "jobManager" to
                                     cluster.flink.jobManager.copy(
                                         readyCount =

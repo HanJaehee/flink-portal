@@ -45,6 +45,8 @@ class KubernetesSource(private val client: KubernetesClient) : ResourceSource {
                             spec["image"]?.toString(),
                             managerResources(spec["jobManager"]),
                             managerResources(spec["taskManager"]),
+                            mode = if (job != null) "APPLICATION" else "SESSION",
+                            applicationJobId = jobStatus?.get("jobId")?.toString(),
                         )
                     }
                 val services = pages { opts ->
