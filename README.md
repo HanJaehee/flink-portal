@@ -202,3 +202,53 @@ Metrics and Logs open the JobManager metrics and log-file screens in the proxied
 Flink UI. Application cards also offer Job details when the Operator's current
 job ID matches a retained REST job. Completed jobs open the completed-job view.
 Shortcuts are disabled while the UI or current application job is unavailable.
+
+## CI and publishing
+
+GitHub Actions runs Kotlin checks, JavaScript tests, Helm lint/render/package
+checks, and a Docker build on pull requests and pushes to `main`. PR builds do
+not publish images or charts and do not require registry secrets.
+
+Pushing a stable `vMAJOR.MINOR.PATCH` tag publishes:
+
+- `docker.io/hindsighta/flink-portal:MAJOR.MINOR.PATCH` for linux/amd64 and linux/arm64.
+- `oci://ghcr.io/hanjaehee/charts/flink-portal`, using `Chart.yaml`'s chart version.
+
+Before releasing, merge the workflows to `main` and configure the repository
+Actions secret `DOCKERHUB_TOKEN` with a Docker Hub access token for `hindsighta`
+that can push to `flink-portal`. GHCR uses the workflow's `GITHUB_TOKEN` with
+`packages: write`; no separate GHCR token is needed. After the first chart
+publication, set the `charts/flink-portal` package visibility to **Public** in
+GitHub Packages to allow anonymous installs.
+
+For each release, update `charts/flink-portal/Chart.yaml` with a new, unused chart
+`version` and set `appVersion` to the application release version. Keep the default
+image repository as `hindsighta/flink-portal` and `image.tag` empty (or set to that
+same application version). For example, an app release `0.2.0` can use chart
+`0.3.0` and `appVersion: "0.2.0"`. Commit and merge these changes before tagging:
+
+```sh
+git switch main
+git pull --ff-only
+git tag -a v0.2.0 -m 'Release 0.2.0'
+git push origin v0.2.0
+```
+
+Publishing validates that the tagged commit belongs to `main`, the tag matches
+`appVersion`, and the chart defaults to the image being published. It reruns CI,
+pushes the image, then publishes the chart so it references an available image.
+Only the versioned image tag is published; no `latest` tag or cluster deployment
+is performed. Releases and chart versions are independent; use fresh versions
+rather than overwriting published artifacts.
+
+After successful publication and the package visibility change:
+
+```sh
+helm upgrade --install flink-portal oci://ghcr.io/hanjaehee/charts/flink-portal \
+  --version 0.3.0 --namespace flink-portal --create-namespace \
+  --set 'portal.namespaces={team-a,team-b}'
+```
+
+The example versions above describe a future release; this change does not create
+a release tag or publish a new image/chart by itself. OCI publication does not
+add Helm provenance signatures.
