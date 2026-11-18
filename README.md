@@ -1,22 +1,55 @@
 # Flink Portal
 
-Automatically discover Flink clusters and access their existing Web UIs through
-one portal. No per-cluster Ingress, ExternalName Service, or URL registration.
+Discover Flink clusters across Kubernetes namespaces and open their existing
+Flink Web UIs through a single portal. One Portal endpoint serves every
+discovered cluster, with optional monitoring for the Flink Kubernetes Operator.
 
 Built with Kotlin, Spring Boot MVC, and the Fabric8 Kubernetes client.
 
-## What it does
+## Clusters
 
-- Lists Operator-managed Flink deployments across configured namespaces.
-- Matches REST Services by namespace and verified Kubernetes ownership, including
-  same-name deployments in different namespaces.
-- Proxies Flink dashboards, REST reads, job details, metrics, and log downloads.
-- Retains stopped deployments and displays a clear unavailable state.
-- Uses read-only Kubernetes access and allows only GET/HEAD through the proxy,
-  while blocking legacy GET job termination and uploaded-JAR plan execution.
+The screenshots below show the Portal UI with synthetic example data.
 
-The portal does not submit, cancel, upgrade, or manage jobs. Use your existing
-Operator workflows for lifecycle changes. It does not recreate Flink's dashboard.
+![Flink Portal Clusters tab with search, job status filters, and deployment cards](assets/screenshots/clusters.jpg)
+
+- **Discover application and session clusters.** Portal finds `FlinkDeployment`
+  resources in the configured namespaces and matches each REST Service using
+  Kubernetes ownership. Deployments with the same name in different namespaces
+  appear separately.
+- **Find a job.** Search by cluster, namespace, job name or job ID, then narrow
+  the list by namespace and job state. Session clusters can show several jobs
+  and match more than one state. Job details include parallelism and start time.
+- **Check availability and resources.** Cards show the Flink version, image,
+  ready manager counts, and configured CPU and memory requests and limits.
+  Suspended deployments stay visible, with UI reachability shown separately
+  from job state.
+- **Open Flink directly from the card.** Use **Open UI**, **Metrics**, or **Logs**
+  for the existing Flink dashboard and JobManager views. **Job details** opens
+  the current Application job when its ID is available. The browser reaches
+  these views through Portal's read-only proxy.
+
+## Operators
+
+![Flink Portal Operators tab with Operator health and live FlinkDeployment status](assets/screenshots/operators.jpg)
+
+The optional Operators tab shows Operator versions, images, ready replicas and
+Pod restarts. **Deployment status** shows the lifecycle, reconciliation state,
+JobManager readiness, and the last observed Application job state. It also
+highlights pending spec changes and errors. Kubernetes watches push changes to
+the screen, and **Recent events** shows the events Kubernetes still retains.
+
+In **Operator logs**, pick a Pod and container, then **Load snapshot** or
+**Start live logs**. Filter by text such as `namespace/deployment`, pause the
+stream, or turn off auto-scroll to inspect a line. Live logs keep the newest
+256 KiB in the browser. Portal reads logs and events from Kubernetes as needed.
+
+Operator monitoring is off by default. Set `portal.operatorMonitor.enabled=true`
+and list your Operator namespaces in `portal.operatorMonitor.namespaces`.
+For local runs, set `PORTAL_OPERATOR_MONITOR_ENABLED=true` and
+`PORTAL_OPERATOR_NAMESPACES=flink-operator`. See the [chart guide](charts/flink-portal/README.md#operator-monitor-optional)
+for permissions and streaming limits.
+
+Use your existing Flink Operator workflow to submit, cancel, or upgrade jobs.
 
 ## Run locally
 
@@ -53,6 +86,8 @@ failure is shown as an error and returns 503 from `/readyz`.
 | `PORTAL_BIND_ADDRESS` | `127.0.0.1` | Bind interface; Helm deployment uses `0.0.0.0`. |
 | `PORT` | `8080` | HTTP port. |
 | `PORTAL_REFRESH_MS` | `5000` | Backend discovery interval in milliseconds. |
+| `PORTAL_OPERATOR_MONITOR_ENABLED` | `false` | Enable Operator health, deployment status, events, and logs. |
+| `PORTAL_OPERATOR_NAMESPACES` | `flink-operator` | Comma-separated namespaces containing Operator Deployments. |
 
 `auto` chooses direct Service access when in-cluster credentials are available
 (`KUBERNETES_SERVICE_HOST` is set and `KUBECONFIG` is not), otherwise API-server
@@ -105,6 +140,9 @@ Every person who can reach an instance can read the namespaces that instance is
 configured and permitted to expose. Use your existing ingress authentication,
 network controls, or a local port forward. Flink's UI/API can reveal job config,
 logs, and data; namespace selection is an instance-wide visibility boundary.
+
+The Flink proxy accepts GET and HEAD requests and blocks legacy GET routes for
+job termination and uploaded-JAR plan execution.
 
 Discovery permissions are `get/list/watch` on:
 
@@ -253,13 +291,3 @@ helm upgrade --install flink-portal oci://ghcr.io/hanjaehee/charts/flink-portal 
 The example versions above describe a future release; this change does not create
 a release tag or publish a new image/chart by itself. OCI publication does not
 add Helm provenance signatures.
-
-### Optional Operator monitoring
-
-The **Operators** tab can show Operator replica/Pod health, image/version, restart counts,
-FlinkDeployment lifecycle/reconciliation state, retained Kubernetes events, and recent
-Operator Pod logs. It is disabled by default. For Helm configuration and required read-only
-RBAC, see [the chart's Operator monitor section](charts/flink-portal/README.md#operator-monitor-optional).
-For local kubeconfig use, set `PORTAL_OPERATOR_MONITOR_ENABLED=true` and
-`PORTAL_OPERATOR_NAMESPACES=flink-operator` (comma-separated explicit namespaces).
-Status changes are pushed through shared Kubernetes Watches. Live logs support pause and optional auto-scroll, with a rolling 256 KiB display buffer.
