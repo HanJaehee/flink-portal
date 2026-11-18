@@ -2,6 +2,7 @@ package io.flinkportal.operator
 
 import io.fabric8.kubernetes.api.model.Event
 import io.fabric8.kubernetes.api.model.HasMetadata
+import io.fabric8.kubernetes.api.model.OwnerReference
 import io.fabric8.kubernetes.client.KubernetesClient
 import io.fabric8.kubernetes.client.dsl.Informable
 import io.fabric8.kubernetes.client.dsl.base.ResourceDefinitionContext
@@ -9,7 +10,8 @@ import io.fabric8.kubernetes.client.informers.ResourceEventHandler
 import io.fabric8.kubernetes.client.informers.SharedIndexInformer
 import io.flinkportal.config.PortalProperties
 import jakarta.annotation.PreDestroy
-import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import org.springframework.stereotype.Service
 
 /** One set of reconnecting Kubernetes watches shared by all browser sessions. */
@@ -20,7 +22,9 @@ class OperatorChanges(
     private val monitor: OperatorMonitor,
 ) : AutoCloseable {
     private val informers = mutableListOf<SharedIndexInformer<*>>()
-    private val revision = AtomicLong()
+    private val pending = AtomicBoolean()
+    private var publishedRevision = 0L
+    private var lastPublishedAt: Long? = null
     private var started = false
     private var closed = false
 
@@ -47,39 +51,54 @@ class OperatorChanges(
             )
         }
         for (ns in properties.operatorNamespaceSet()) {
-            add(
-                client
-                    .apps()
-                    .deployments()
-                    .inNamespace(ns)
-                    .withLabel("app.kubernetes.io/name", "flink-kubernetes-operator")
-            )
-            add(client.apps().replicaSets().inNamespace(ns))
-            add(client.pods().inNamespace(ns))
+            val deployments =
+                add(
+                    client
+                        .apps()
+                        .deployments()
+                        .inNamespace(ns)
+                        .withLabel("app.kubernetes.io/name", "flink-kubernetes-operator")
+                )
+            val replicaSets =
+                add(client.apps().replicaSets().inNamespace(ns)) { set ->
+                    deployments.owns(set, "Deployment")
+                }
+            add(client.pods().inNamespace(ns)) { pod ->
+                val set = replicaSets.ownerOf(pod, "ReplicaSet")
+                set != null && deployments.owns(set, "Deployment")
+            }
         }
         informers.forEach { it.start() }
     }
 
     private fun changed() {
-        monitor.invalidate()
-        revision.incrementAndGet()
+        pending.set(true)
     }
 
-    private fun <T : HasMetadata> add(operation: Informable<T>) {
+    private fun <T : HasMetadata> add(
+        operation: Informable<T>,
+        relevant: (T) -> Boolean = { true },
+    ): SharedIndexInformer<T> {
         val informer =
             operation
                 .runnableInformer(0)
                 .addEventHandler(
                     object : ResourceEventHandler<T> {
-                        override fun onAdd(resource: T) = changed()
+                        override fun onAdd(resource: T) {
+                            if (relevant(resource)) changed()
+                        }
 
                         override fun onUpdate(old: T, current: T) {
-                            if (old.metadata.resourceVersion != current.metadata.resourceVersion)
+                            if (
+                                old.metadata.resourceVersion != current.metadata.resourceVersion &&
+                                    (relevant(old) || relevant(current))
+                            )
                                 changed()
                         }
 
-                        override fun onDelete(resource: T, deletedFinalStateUnknown: Boolean) =
-                            changed()
+                        override fun onDelete(resource: T, deletedFinalStateUnknown: Boolean) {
+                            if (relevant(resource)) changed()
+                        }
                     }
                 )
                 .exceptionHandler { _, _ ->
@@ -87,9 +106,23 @@ class OperatorChanges(
                     true
                 }
         informers.add(informer)
+        return informer
     }
 
-    fun revision(): Long = revision.get()
+    @Synchronized
+    fun revision(): Long {
+        val now = System.nanoTime()
+        val last = lastPublishedAt
+        // The SSE loop also checks on idle ticks, so changes queued here are eventually published.
+        if (
+            (last == null || now - last >= TimeUnit.SECONDS.toNanos(1)) && pending.getAndSet(false)
+        ) {
+            monitor.invalidate()
+            lastPublishedAt = now
+            publishedRevision++
+        }
+        return publishedRevision
+    }
 
     @Synchronized
     fun watching(): Boolean =
@@ -104,5 +137,20 @@ class OperatorChanges(
         closed = true
         informers.forEach { it.close() }
         informers.clear()
+    }
+}
+
+private fun <T : HasMetadata> SharedIndexInformer<T>.owns(
+    child: HasMetadata,
+    kind: String,
+): Boolean = ownerOf(child, kind) != null
+
+private fun <T : HasMetadata> SharedIndexInformer<T>.ownerOf(child: HasMetadata, kind: String): T? {
+    val ref: OwnerReference =
+        child.metadata.ownerReferences.orEmpty().singleOrNull {
+            it.controller == true && it.apiVersion == "apps/v1" && it.kind == kind
+        } ?: return null
+    return store.getByKey("${child.metadata.namespace}/${ref.name}")?.takeIf {
+        it.metadata.uid == ref.uid
     }
 }
