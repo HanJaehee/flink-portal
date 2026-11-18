@@ -26,7 +26,7 @@ Your kubeconfig context must have the discovery permissions described below and
 
 ```sh
 ./gradlew check bootJar
-node --test src/test/portal-model.test.mjs # Node.js 22+
+node --test src/test/*.test.mjs # Node.js 22+
 export KUBECONFIG="$HOME/.kube/config"
 export PORTAL_KUBE_CONTEXT=my-context
 export PORTAL_NAMESPACES=team-a,team-b
@@ -73,13 +73,13 @@ The browser refreshes the list every five seconds independently of the backend i
 ## Deploy in Kubernetes with Helm
 
 The reusable chart is in [`charts/flink-portal`](charts/flink-portal/README.md).
-The chart defaults to [`hindsighta/flink-portal:0.2.0`](https://hub.docker.com/r/hindsighta/flink-portal)
-(full reference: `docker.io/hindsighta/flink-portal:0.2.0`). Release images support
+The chart defaults to [`hindsighta/flink-portal:0.3.0`](https://hub.docker.com/r/hindsighta/flink-portal)
+(full reference: `docker.io/hindsighta/flink-portal:0.3.0`). Release images support
 linux/amd64 and linux/arm64 and are published publicly by the release workflow.
 Wait for successful publication before installing a new release version.
 
 ```sh
-docker pull hindsighta/flink-portal:0.2.0
+docker pull hindsighta/flink-portal:0.3.0
 helm upgrade --install flink-portal charts/flink-portal \
   --namespace flink-portal --create-namespace \
   --set 'portal.namespaces={team-a,team-b}' \
@@ -162,7 +162,7 @@ do not generate per-request warning logs.
 ./gradlew test
 ./gradlew formatKotlin
 ./gradlew check bootJar
-node --test src/test/portal-model.test.mjs # Node.js 22+
+node --test src/test/*.test.mjs # Node.js 22+
 ```
 
 Tests cover namespace isolation, ownership and UID replacement, EndpointSlice
@@ -225,14 +225,14 @@ GitHub Packages to allow anonymous installs.
 For each release, update `charts/flink-portal/Chart.yaml` with a new, unused chart
 `version` and set `appVersion` to the application release version. Keep the default
 image repository as `hindsighta/flink-portal` and `image.tag` empty (or set to that
-same application version). For example, an app release `0.2.0` can use chart
-`0.2.2` and `appVersion: "0.2.0"`. Commit and merge these changes before tagging:
+same application version). For example, an app release `0.3.0` can use chart
+`0.3.0` and `appVersion: "0.3.0"`. Commit and merge these changes before tagging:
 
 ```sh
 git switch main
 git pull --ff-only
-git tag -a v0.2.0 -m 'Release 0.2.0'
-git push origin v0.2.0
+git tag -a v0.3.0 -m 'Release 0.3.0'
+git push origin v0.3.0
 ```
 
 Publishing validates that the tagged commit belongs to `main`, the tag matches
@@ -246,10 +246,20 @@ After successful publication and the package visibility change:
 
 ```sh
 helm upgrade --install flink-portal oci://ghcr.io/hanjaehee/charts/flink-portal \
-  --version 0.2.2 --namespace flink-portal --create-namespace \
+  --version 0.3.0 --namespace flink-portal --create-namespace \
   --set 'portal.namespaces={team-a,team-b}'
 ```
 
 The example versions above describe a future release; this change does not create
 a release tag or publish a new image/chart by itself. OCI publication does not
 add Helm provenance signatures.
+
+### Optional Operator monitoring
+
+The **Operators** tab can show Operator replica/Pod health, image/version, restart counts,
+FlinkDeployment lifecycle/reconciliation state, retained Kubernetes events, and recent
+Operator Pod logs. It is disabled by default. For Helm configuration and required read-only
+RBAC, see [the chart's Operator monitor section](charts/flink-portal/README.md#operator-monitor-optional).
+For local kubeconfig use, set `PORTAL_OPERATOR_MONITOR_ENABLED=true` and
+`PORTAL_OPERATOR_NAMESPACES=flink-operator` (comma-separated explicit namespaces).
+Status changes are pushed through shared Kubernetes Watches. Live logs support pause and optional auto-scroll, with a rolling 256 KiB display buffer.

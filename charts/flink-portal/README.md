@@ -11,7 +11,7 @@ connects to Portal. Flink Operator CRDs and native Flink deployments must exist.
 
 ## Install
 
-The default image reference is [`hindsighta/flink-portal:0.2.0`](https://hub.docker.com/r/hindsighta/flink-portal).
+The default image reference is [`hindsighta/flink-portal:0.3.0`](https://hub.docker.com/r/hindsighta/flink-portal).
 The release workflow publishes linux/amd64 and linux/arm64 images publicly.
 Wait for publication to finish before installing a new release; no image pull
 Secret is required for a published public image.
@@ -98,3 +98,44 @@ The chart version is independent of its `appVersion` and the Docker image tag.
 See the repository's [CI and publishing instructions](../../README.md#ci-and-publishing)
 for token setup, release tagging, and initial package visibility. Source installs
 above remain available before the first OCI publication.
+
+## Operator monitor (optional)
+
+Enable the Operators tab with status, retained Kubernetes events and live Operator logs:
+
+```yaml
+portal:
+  namespaces: [flink-jobs-a, flink-jobs-b]
+  operatorMonitor:
+    enabled: true
+    namespaces: [flink-operator]
+```
+
+Discovery selects Deployments labelled `app.kubernetes.io/name=flink-kubernetes-operator`
+inside the configured Operator namespaces. Custom installations must provide that label.
+Pods must be owned by a ReplicaSet belonging to the selected Deployment. Resource activity
+covers `portal.namespaces`; it does not infer which Operator owns a FlinkDeployment when
+multiple Operators watch overlapping namespaces.
+
+When `rbac.create=true`, monitoring adds namespaced Roles for deployment/replicaset/pod
+get/list/watch and `pods/log` get in Operator namespaces, plus event reads in discovery namespaces.
+No Secrets, exec or write permissions are granted. Kubernetes RBAC grants log reads for
+all Pods in those Operator namespaces; Portal additionally restricts its log endpoint to
+verified Operator-owned Pods. With `rbac.create=false`, provision equivalent permissions.
+
+Manual snapshots contain the last hour, default 500/max 2,000 lines, up to 256 KiB. Live logs start with the same recent tail and keep following new output, with a rolling 256 KiB browser buffer. They are
+read through Portal's ServiceAccount; the browser never contacts Kubernetes directly.
+Events expire in Kubernetes, and no history is stored. Lifecycle is the Operator's last
+reported observation, not an exact live task or progress percentage. Jobs submitted directly
+to a session cluster have no `FlinkSessionJob` activity here. This monitor currently lists
+FlinkDeployments only. Kubernetes status changes use shared reconnecting Watches and SSE to the browser. If Watches
+are unavailable, the UI labels snapshot fallback instead of claiming to be live. Live logs
+can be paused and optionally auto-scrolled. Streams rotate about every two minutes and
+reconnect automatically, reloading the recent tail; there is no gap-free archival replay.
+Changing containers, leaving the Operators tab or hiding the page closes browser streams.
+The server allows 16 status streams and 4 combined snapshot/follow log requests per instance,
+with a bounded follow queue. Slow log readers reconnect with a fresh tail. Reverse proxies
+must allow SSE and avoid response buffering. Metrics/Prometheus is not required.
+
+Portal has no built-in authentication. Its existing trusted-network or authenticated
+Ingress boundary also protects the operational events and logs exposed by this option.

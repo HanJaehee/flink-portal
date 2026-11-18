@@ -11,6 +11,11 @@
 <body>
   <header class="topbar"><a class="brand" href="/" aria-label="Flink Portal home"><span class="mark" aria-hidden="true">↗</span> Flink<span class="brand-light">Portal</span></a><span class="top-note">One place. Every cluster.</span><span class="connection" id="connection"><i></i> Connecting</span></header>
   <main>
+    <nav class="view-tabs" role="tablist" aria-label="Portal views">
+      <button id="clusters-tab" role="tab" aria-selected="true" aria-controls="clusters-view" type="button">Clusters</button>
+      <button id="operators-tab" role="tab" aria-selected="false" aria-controls="operators-view" tabindex="-1" type="button">Operators</button>
+    </nav>
+    <div id="clusters-view" role="tabpanel" aria-labelledby="clusters-tab">
     <section class="stats" aria-label="Cluster overview"><div><span class="stat-label">Discovered clusters</span><strong id="total">—</strong></div><div><span class="stat-label"><i class="dot green"></i> UI available</span><strong id="available">—</strong></div><div><span class="stat-label"><i class="dot amber"></i> UI unavailable</span><strong id="unavailable">—</strong></div></section>
     <section class="workspace" aria-label="Clusters">
       <div class="section-heading"><h2>Clusters <span id="count" class="count">0</span></h2><div class="refresh"><span id="updated" aria-live="polite">Discovering clusters…</span><button type="button" id="refresh" aria-label="Refresh clusters">↻ <span>Refresh</span></button></div></div>
@@ -20,6 +25,33 @@
       <div id="clusters" class="cluster-grid" aria-label="Discovered clusters"></div>
       <div id="empty" class="empty" hidden><span aria-hidden="true">◇</span><h3>No matching clusters</h3><p id="empty-description">Clusters will appear as they are discovered.</p></div>
       <div class="table-footer"><span id="showing">Waiting for discovery</span><span><i class="dot green"></i> Auto-refresh every 5 seconds</span></div>
+    </section>
+    </div>
+    <section id="operators-view" role="tabpanel" aria-labelledby="operators-tab" hidden>
+      <div class="section-heading"><h2>Operators</h2><div class="refresh"><span id="operators-updated" aria-live="polite">Waiting for discovery</span><button id="operators-refresh" type="button">↻ Refresh</button></div></div>
+      <div id="operators-errors" class="error" role="alert" hidden></div>
+      <div id="operators-disabled" class="empty" hidden><h3>Operator monitor is disabled</h3><p>Enable Operator monitoring in the Portal configuration to view status, events and logs.</p></div>
+      <div id="operators-content" hidden>
+        <div id="operators-cards" class="cluster-grid"></div>
+        <p id="operators-empty" class="monitor-note" hidden>No Operators found in the configured Operator namespaces.</p>
+        <section class="monitor-section" aria-label="Deployment status">
+          <div class="section-heading"><h3>Deployment status <span id="operator-resource-count" class="count">0</span></h3><label class="namespace-label">Namespace <select id="operator-resource-namespace"><option value="">All namespaces</option></select></label></div>
+          <p class="monitor-note">FlinkDeployments in Portal discovery namespaces. Lifecycle shows the Operator's last reported state, not a live execution trace. Session jobs submitted directly to Flink are not tracked here.</p>
+          <div class="monitor-table-scroll"><table class="monitor-table"><thead><tr><th>Resource</th><th>Lifecycle</th><th>Reconciliation</th><th>JobManager</th><th>Observed job</th><th>Spec / error</th></tr></thead><tbody id="operator-resources"></tbody></table></div>
+        </section>
+        <section class="monitor-section" aria-label="Recent Kubernetes events"><h3>Recent events</h3><p class="monitor-note">Up to 100 retained events for current FlinkDeployments. Kubernetes expires events; an empty list does not mean there was no activity.</p><ul id="operator-events" class="operator-events"></ul></section>
+        <section class="monitor-section" aria-label="Operator pod logs">
+          <div class="section-heading"><h3>Operator logs</h3><div class="log-actions"><button id="operator-load-logs" class="open" type="button" disabled>Load snapshot</button><button id="operator-live-logs" class="open primary" type="button" aria-pressed="false" disabled>Start live logs</button></div></div>
+          <div class="log-controls">
+            <div class="log-target-control"><label for="operator-log-target">Pod / container</label><select id="operator-log-target" aria-label="Pod / container"><option value="">Select a container</option></select></div>
+            <label>Lines <select id="operator-log-lines"><option value="200">200</option><option value="500" selected>500</option><option value="2000">2,000</option></select></label>
+            <label class="log-scroll-control"><input type="checkbox" id="operator-log-autoscroll" checked> Auto-scroll</label>
+            <label>Filter <input type="search" id="operator-log-filter" placeholder="Text or namespace/name…"></label>
+          </div>
+          <p id="operator-log-status" class="monitor-note" role="status">Recent logs · rolling 256 KiB buffer. Select a container to load a snapshot or start live logs.</p>
+          <pre id="operator-log-output" class="operator-log-output" tabindex="0" aria-label="Operator log output">No logs loaded.</pre>
+        </section>
+      </div>
     </section>
     <footer><span>FLINK PORTAL</span><span>A direct route to your existing Flink Web UIs.</span></footer>
   </main>

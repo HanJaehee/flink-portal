@@ -14,6 +14,9 @@ rbac:
 portal:
   namespaces: [default] # Existing namespaces to discover; explicit names only.
   refreshMs: 5000
+  operatorMonitor:
+    enabled: false
+    namespaces: [flink-operator] # Existing namespaces containing Operator Deployments.
 service:
   port: 8080
 ingress:

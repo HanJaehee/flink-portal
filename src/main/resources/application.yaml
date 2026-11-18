@@ -15,3 +15,5 @@ portal:
   kube-context: ${PORTAL_KUBE_CONTEXT:}
   transport: ${PORTAL_TRANSPORT:auto}
   refresh-ms: ${PORTAL_REFRESH_MS:5000}
+  operator-monitor-enabled: ${PORTAL_OPERATOR_MONITOR_ENABLED:false}
+  operator-namespaces: ${PORTAL_OPERATOR_NAMESPACES:flink-operator}
