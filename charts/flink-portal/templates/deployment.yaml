@@ -44,6 +44,10 @@ spec:
               value: direct
             - name: PORTAL_NAMESPACES
               value: {{ join "," .Values.portal.namespaces | quote }}
+            - name: PORTAL_OPERATOR_MONITOR_ENABLED
+              value: {{ .Values.portal.operatorMonitor.enabled | quote }}
+            - name: PORTAL_OPERATOR_NAMESPACES
+              value: {{ join "," .Values.portal.operatorMonitor.namespaces | quote }}
             - name: PORTAL_REFRESH_MS
               value: {{ .Values.portal.refreshMs | quote }}
           resources:

@@ -31,3 +31,6 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- $identity := printf "%s/%s" .Release.Namespace (include "flink-portal.fullname" .) -}}
 {{- printf "%s-%s-reader" (include "flink-portal.fullname" . | trunc 40 | trimSuffix "-") (sha256sum $identity | trunc 8) -}}
 {{- end -}}
+{{- define "flink-portal.operatorReaderName" -}}
+{{- printf "%s-operator" (include "flink-portal.readerName" . | trunc 54 | trimSuffix "-") -}}
+{{- end -}}

@@ -19,6 +19,11 @@ rules:
   - apiGroups: [apps]
     resources: [deployments]
     verbs: [get, list, watch]
+  {{- if $root.Values.portal.operatorMonitor.enabled }}
+  - apiGroups: [""]
+    resources: [events]
+    verbs: [get, list, watch]
+  {{- end }}
   - apiGroups: [discovery.k8s.io]
     resources: [endpointslices]
     verbs: [get, list, watch]
@@ -34,6 +39,46 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
   name: {{ include "flink-portal.readerName" $root }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "flink-portal.serviceAccountName" $root }}
+    namespace: {{ $root.Release.Namespace }}
+{{- end }}
+{{- end }}
+
+{{- if and .Values.rbac.create .Values.portal.operatorMonitor.enabled }}
+{{- $root := . }}
+{{- range .Values.portal.operatorMonitor.namespaces }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "flink-portal.operatorReaderName" $root }}
+  namespace: {{ . | quote }}
+  labels:
+    {{- include "flink-portal.labels" $root | nindent 4 }}
+rules:
+  - apiGroups: [apps]
+    resources: [deployments, replicasets]
+    verbs: [get, list, watch]
+  - apiGroups: [""]
+    resources: [pods]
+    verbs: [get, list, watch]
+  - apiGroups: [""]
+    resources: [pods/log]
+    verbs: [get]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "flink-portal.operatorReaderName" $root }}
+  namespace: {{ . | quote }}
+  labels:
+    {{- include "flink-portal.labels" $root | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "flink-portal.operatorReaderName" $root }}
 subjects:
   - kind: ServiceAccount
     name: {{ include "flink-portal.serviceAccountName" $root }}

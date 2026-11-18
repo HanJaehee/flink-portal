@@ -1,3 +1,4 @@
+import { initializeOperators } from './operators.js';
 /* Resource names and status messages are always rendered as text, never markup. */
 import { clusterStates, matchesCluster, clusterLinks } from './portal-model.js';
 const byId = (id) => document.getElementById(id);
@@ -152,3 +153,5 @@ byId('namespace').addEventListener('change', render);
 byId('refresh').addEventListener('click', refresh);
 refresh();
 setInterval(refresh, 5000);
+
+initializeOperators();
